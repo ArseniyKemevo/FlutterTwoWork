@@ -1,42 +1,95 @@
+import 'dart:collection';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'cubit/notes_cubit.dart';
+import 'package:provider/provider.dart';
 
 void main() => runApp(const NotesApp());
+
+class Note {
+  String text;
+  bool isImportant;
+
+  Note({
+    required this.text,
+    this.isImportant = false,
+  });
+}
+
+class NotesProvider extends ChangeNotifier {
+  final List<Note> _notes = [];
+
+  UnmodifiableListView<Note> get notes => UnmodifiableListView(_notes);
+
+  void addNote(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isNotEmpty) {
+      _notes.add(Note(text: trimmed));
+      notifyListeners();
+    }
+  }
+
+  void deleteNote(int index) {
+    _notes.removeAt(index);
+    notifyListeners();
+  }
+
+  void editNote(int index, String newText) {
+    final trimmed = newText.trim();
+    if (trimmed.isNotEmpty) {
+      _notes[index].text = trimmed;
+      notifyListeners();
+    }
+  }
+
+  void markAsImportant(int index) {
+    if (!_notes[index].isImportant) {
+      _notes[index].isImportant = true;
+      notifyListeners();
+    }
+  }
+
+  void restoreNormalStatus(int index) {
+    if (_notes[index].isImportant) {
+      _notes[index].isImportant = false;
+      notifyListeners();
+    }
+  }
+}
 
 class NotesApp extends StatelessWidget {
   const NotesApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => NotesCubit(),
+    return ChangeNotifierProvider(
+      create: (_) => NotesProvider(),
       child: MaterialApp(
-        title: 'Заметки',
+        title: 'Мои заметки',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFFF06292),
-            primary: const Color(0xFFE91E63),
-            surface: Colors.white,
+          brightness: Brightness.dark,
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFFFF1744),
+            secondary: Color(0xFFB0BEC5),
+            surface: Color(0xFF16161A),
           ),
-          scaffoldBackgroundColor: const Color(0xFFFFF5F7),
+          scaffoldBackgroundColor: const Color(0xFF0B0B0E),
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
-            fillColor: Colors.white,
-            labelStyle: const TextStyle(color: Color(0xFFBA68C8)),
+            fillColor: const Color(0xFF16161A),
+            labelStyle: const TextStyle(color: Color(0xFF9E9EA9)),
+            hintStyle: const TextStyle(color: Color(0xFF6E6E7A)),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFFF8BBD0)),
+              borderSide: const BorderSide(color: Color(0xFF2A2A32)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFFF8BBD0)),
+              borderSide: const BorderSide(color: Color(0xFF2A2A32)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFFE91E63), width: 1.5),
+              borderSide: const BorderSide(color: Color(0xFFFF1744), width: 1.5),
             ),
           ),
         ),
@@ -57,37 +110,99 @@ class _NotesScreenState extends State<NotesScreen> {
   final TextEditingController _textController = TextEditingController();
 
   void _addNote() {
-    context.read<NotesCubit>().addNote(_textController.text);
+    context.read<NotesProvider>().addNote(_textController.text);
     _textController.clear();
     FocusScope.of(context).unfocus();
   }
 
-  void _editNote(int index, String currentText) {
-    final controller = TextEditingController(text: currentText);
-
+  void _viewNote(Note note) {
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: const Color(0xFF18181D),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: note.isImportant
+                ? const Color(0xFFFF1744)
+                : const Color(0xFF2E2E38),
+          ),
+        ),
+        title: Row(
+          children: [
+            Text(note.isImportant ? '⭐️ ' : '💀 '),
+            Expanded(
+              child: Text(
+                note.isImportant ? 'Важная заметка' : 'Просмотр заметки',
+                style: const TextStyle(
+                  color: Color(0xFFF5F5F7),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Text(
+            note.text,
+            style: const TextStyle(
+              color: Color(0xFFD1D1D6),
+              fontSize: 16,
+              height: 1.4,
+            ),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFFF1744),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Закрыть'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editNote(int index, String currentText) {
+    final controller = TextEditingController(text: currentText);
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF18181D),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFF2E2E38)),
+        ),
         title: const Text(
-          'Редактировать заметку',
-          style: TextStyle(color: Color(0xFFC2185B), fontWeight: FontWeight.bold),
+          '💀 Редактировать',
+          style: TextStyle(
+            color: Color(0xFFF5F5F7),
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Введите новый текст...'),
+          maxLines: null,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(hintText: 'Введите текст...'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Отмена', style: TextStyle(color: Colors.grey)),
+            child: const Text('Отмена', style: TextStyle(color: Color(0xFF8E8E9A))),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFF06292)),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFFF1744),
+              foregroundColor: Colors.white,
+            ),
             onPressed: () {
-              context.read<NotesCubit>().editNote(index, controller.text);
+              context.read<NotesProvider>().editNote(index, controller.text);
               Navigator.pop(dialogCtx);
             },
             child: const Text('Сохранить'),
@@ -108,13 +223,17 @@ class _NotesScreenState extends State<NotesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Мои заметки',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFC2185B)),
+          '💀 МОИ ЗАМЕТКИ',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+            color: Color(0xFFF5F5F7),
+          ),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF121216),
         elevation: 0,
-        shape: const Border(bottom: BorderSide(color: Color(0xFFFCE4EC))),
+        shape: const Border(bottom: BorderSide(color: Color(0xFF25252D))),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -125,7 +244,8 @@ class _NotesScreenState extends State<NotesScreen> {
                 Expanded(
                   child: TextField(
                     controller: _textController,
-                    decoration: const InputDecoration(labelText: 'Введите текст заметки'),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(labelText: 'Новая заметка...'),
                     onSubmitted: (_) => _addNote(),
                   ),
                 ),
@@ -133,63 +253,174 @@ class _NotesScreenState extends State<NotesScreen> {
                 FilledButton(
                   onPressed: _addNote,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFF06292),
+                    backgroundColor: const Color(0xFFFF1744),
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
-                  child: const Text('Сохранить'),
+                  child: const Text(
+                    'Добавить',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            const Divider(color: Color(0xFFFCE4EC), thickness: 1.5),
+            const Divider(color: Color(0xFF25252D), thickness: 1.5),
             Expanded(
-              child: BlocBuilder<NotesCubit, NotesState>(
-                builder: (context, state) {
-                  if (state.notes.isEmpty) {
+              child: Consumer<NotesProvider>(
+                builder: (context, notesProvider, child) {
+                  final notes = notesProvider.notes;
+                  if (notes.isEmpty) {
                     return const Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.favorite_border_rounded, size: 48, color: Color(0xFFF48FB1)),
-                          SizedBox(height: 8),
-                          Text('Список пуст', style: TextStyle(color: Color(0xFFBA68C8), fontSize: 16)),
+                          Text('💀', style: TextStyle(fontSize: 54)),
+                          SizedBox(height: 12),
+                          Text(
+                            'Пока тут пусто...',
+                            style: TextStyle(
+                              color: Color(0xFF8E8E9A),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ],
                       ),
                     );
                   }
-
                   return ListView.builder(
-                    itemCount: state.notes.length,
-                    itemBuilder: (context, index) => Card(
-                      color: Colors.white,
-                      elevation: 1.5,
-                      shadowColor: const Color(0x33F48FB1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: Color(0xFFFCE4EC)),
-                      ),
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      child: ListTile(
-                        title: Text(
-                          state.notes[index],
-                          style: const TextStyle(color: Color(0xFF4A154B), fontSize: 16),
+                    itemCount: notes.length,
+                    itemBuilder: (context, index) {
+                      final note = notes[index];
+                      return Dismissible(
+                        key: ObjectKey(note),
+                        background: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF262630),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFF454555)),
+                          ),
+                          alignment: Alignment.centerLeft,
+                          child: const Row(
+                            children: [
+                              Icon(Icons.restore_rounded, color: Colors.white),
+                              SizedBox(width: 8),
+                              Text(
+                                'Обычный статус',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit_rounded, color: Color(0xFFF06292)),
-                              onPressed: () => _editNote(index, state.notes[index]),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFE57373)),
-                              onPressed: () => context.read<NotesCubit>().deleteNote(index),
-                            ),
-                          ],
+                        secondaryBackground: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFB71C1C),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          alignment: Alignment.centerRight,
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Удалить',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(Icons.delete_forever_rounded, color: Colors.white),
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
+                        confirmDismiss: (direction) async {
+                          if (direction == DismissDirection.startToEnd) {
+                            // Свайп вправо -> сбрасываем статус важной и возвращаем карточку на место
+                            notesProvider.restoreNormalStatus(index);
+                            return false;
+                          }
+                          return true;
+                        },
+                        onDismissed: (direction) {
+                          if (direction == DismissDirection.endToStart) {
+                            notesProvider.deleteNote(index);
+                          }
+                        },
+                        child: Card(
+                          clipBehavior: Clip.antiAlias,
+                          color: note.isImportant
+                              ? const Color(0xFF291318)
+                              : const Color(0xFF16161B),
+                          elevation: 3,
+                          shadowColor: note.isImportant
+                              ? const Color(0x44FF1744)
+                              : Colors.black54,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(
+                              color: note.isImportant
+                                  ? const Color(0xFFFF1744)
+                                  : const Color(0xFF282832),
+                              width: note.isImportant ? 1.5 : 1.0,
+                            ),
+                          ),
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          child: InkWell(
+                            onTap: () => _viewNote(note),
+                            onDoubleTap: () => notesProvider.markAsImportant(index),
+                            onLongPress: () => _editNote(index, note.text),
+                            child: ListTile(
+                              leading: Text(
+                                note.isImportant ? '⭐️' : '💀',
+                                style: const TextStyle(fontSize: 22),
+                              ),
+                              title: Text(
+                                note.text,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: const Color(0xFFF2F2F7),
+                                  fontSize: 16,
+                                  fontWeight: note.isImportant
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit_rounded,
+                                      color: Color(0xFF9E9EA9),
+                                    ),
+                                    onPressed: () => _editNote(index, note.text),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline_rounded,
+                                      color: Color(0xFFFF5252),
+                                    ),
+                                    onPressed: () => notesProvider.deleteNote(index),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
